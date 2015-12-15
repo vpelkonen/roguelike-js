@@ -128,6 +128,15 @@ Game.Entity.prototype.tryMove = function(x,y,z,map){
 	// Check if we can walk on the tile, and walk into it if positive
 	else if(tile.isWalkable()){
 		this.setPosition(x,y,z);
+		// Notify if there are items
+		var items = this.getMap().getItemsAt(x,y,z);
+		if(items){
+			if (items.length === 1){
+				Game.sendMessage(this, "You see %s.", [items[0].describeA()]);
+			} else{
+				Game.sendMessage(this, "There are several objects here.");
+			}
+		}
 		return true;
 	} // Check if the tile is diggable, and dig if positive
 	else if(tile.isDiggable()){

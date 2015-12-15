@@ -83,6 +83,67 @@ Game.Mixins.Destructible = {
 	}
 }
 
+Game.Mixins.InventoryHolder = {
+	name:'InventoryHolder',
+	init: function(template) {
+		// TODO: make inventory size reasonable
+		var inventorySlots = template['inventorySlots'] || 10;
+		this._items = new Array(inventorySlots);
+	},
+	getItems: function(){
+		return this._items;
+	},
+	getItem: function(i){
+		return this._items[i];
+	},
+	addItem: function(item){
+		// Find a slot, if available
+		for (var i=0; i < this._items.length; i++){
+			if(!this._items[i]){
+				this._items[i] = item;
+				return true;
+			}
+		}
+		return false;
+	},
+	removeItem: function(i){
+		this._items[i] = null;
+	},
+	canAddItem: function(){
+		for(var i=0; i < this._items.length; i++){
+			if(!this._items[i]){
+				return true;
+			}
+		}
+		return false;
+	},
+	pickupItems: function(indices){
+		var mapItems = this._map.getItemsAt(this.getX(), this.getY(), this.getZ());
+		var added = 0;
+		for(var i=0; i < indices.length; i++){
+			if(this.addItem(mapItems[indices[i] - added])){
+				mapItems.splice(indices[i] - added, 1);
+				added++;
+			} else{
+				// Inventory full
+				break;
+			}
+		}
+		// Update map items
+		this._map.setItemsAt(this.getX(), this.getY(), this.getZ(), mapItems);
+		// Return true only if we added all items
+		return added === indices.length;
+	},
+	dropItem: function(i){
+		if(this._items[i]){
+			if(this._map){
+				this._map.addItem(this.getX(), this.getY(), this.getZ(), this._items[i]);
+			}
+			this.removeItem(i);
+		}
+	}
+}
+
 // Main player's actor mixin
 Game.Mixins.PlayerActor = {
 	name:'PlayerActor',
@@ -103,15 +164,15 @@ Game.Mixins.PlayerActor = {
 }
 
 
-// Dog's actor mixin
-Game.Mixins.DogActor = {
-	name: 'DogActor',
+// Fungus's actor mixin
+Game.Mixins.FungusActor = {
+	name: 'FungusActor',
 	groupName: 'Actor',
 	init: function(){
 		this._growthsRemaining = 5;
 	},
 	act: function(){
-		// Check if the dog tries to breed this turn
+		// Check if the fungus tries to breed this turn
 		if (this._growthsRemaining > 0){
 			if (Math.random() <= 0.02){
 				// Generate the coordinates of a random adjacent square by generating an offset between [-1,0,1] for both the x and y directions. To do this, we generate a number from 0-2 and then subtract 1.
@@ -123,12 +184,12 @@ Game.Mixins.DogActor = {
 					if (this.getMap().isEmptyFloor(	this.getX() + xOffset,
 													this.getY() + yOffset,
 													this.getZ()) ){
-						/*var entity = new Game.EntityRepository.create('fungus');
+						var entity = Game.EntityRepository.create('fungus');
 						entity.setPosition(this.getX() + xOffset, this.getY() + yOffset, this.getZ());
 						this.getMap().addEntity(entity);
 						this._growthsRemaining--;
 						// Send a message nearby
-						Game.sendMessageNearby(this.getMap(), entity.getX(), entity.getY(), entity.getZ(), 'The fungus is spreading!')*/
+						Game.sendMessageNearby(this.getMap(), entity.getX(), entity.getY(), entity.getZ(), 'The fungus is spreading!');
 					}
 				}
 			}
@@ -170,9 +231,8 @@ Game.sendMessageNearby = function(map, centerX, centerY, centerZ, message, args)
 	}
 	// Get nearby entities
 	var entities = map.getEntitiesWithinRadius(centerX, centerY, centerZ, 5);
-	console.log(entities.length);
 	// Iterate through nearby entities, sending the message if they have the recipient mixin
-	for (var i = 0; entities.length; i++){
+	for (var i = 0; i < entities.length; i++){
 		if(entities[i].hasMixin(Game.Mixins.MessageRecipient)){
 			entities[i].receiveMessage(message);
 		}
@@ -180,11 +240,7 @@ Game.sendMessageNearby = function(map, centerX, centerY, centerZ, message, args)
 };
 
 
-
-
-
 /*==={ TEMPLATES }===*/
-
 // Player
 Game.PlayerTemplate = {
 	name: 'you',
@@ -194,12 +250,14 @@ Game.PlayerTemplate = {
 	attackValue: 3,
 	defenseValue: 1,
 	sightRadius: 6,
+	inventorySlots: 22,
 	mixins: [	Game.Mixins.PlayerActor,
 				Game.Mixins.Attacker, Game.Mixins.Destructible,
-				Game.Mixins.Sight, Game.Mixins.MessageRecipient]
+				Game.Mixins.Sight, Game.Mixins.MessageRecipient,
+				Game.Mixins.InventoryHolder]
 };
 
-// Create our central entity repository
+// Central entity repository
 Game.EntityRepository = new Game.Repository('entities', Game.Entity);
 
 Game.EntityRepository.define('fungus', {
@@ -207,7 +265,7 @@ Game.EntityRepository.define('fungus', {
 	character: 'd',
 	foreground: 'white',
 	maxHp: 5,
-	mixins: [Game.Mixins.DogActor, Game.Mixins.Destructible]
+	mixins: [Game.Mixins.FungusActor, Game.Mixins.Destructible]
 });
 
 Game.EntityRepository.define('bat', {
